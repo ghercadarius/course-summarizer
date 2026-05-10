@@ -1,14 +1,25 @@
 #!/bin/bash
 set -euo pipefail
 
-# Convert all .mp4 files in the current directory to .mp3.
-# Exits quietly if no .mp4 files are present.
+#!/bin/bash
+set -euo pipefail
+
+# Usage: convertmp3.sh [target_dir]
+# Converts all .mp4 files in the target directory to .mp3.
+# Defaults to current directory when no argument is provided.
+TARGET_DIR="${1:-.}"
+
+if [ ! -d "$TARGET_DIR" ]; then
+    echo "Error: target directory does not exist: $TARGET_DIR" >&2
+    exit 1
+fi
+
 shopt -s nullglob
-files=( *.mp4 )
+files=( "$TARGET_DIR"/*.mp4 )
 shopt -u nullglob
 
 if [ ${#files[@]} -eq 0 ]; then
-    echo "No mp4 files found. Nothing to convert."
+    echo "No mp4 files found in $TARGET_DIR. Nothing to convert."
     exit 0
 fi
 
