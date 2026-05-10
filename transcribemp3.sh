@@ -33,12 +33,19 @@ ensure_whisper_runtime() {
 
 ensure_whisper_runtime
 
-# Folder to scan (current folder by default)
+# Folders
 INPUT_DIR="${1:-.}"
+OUTPUT_DIR="${2:-./output}"
 
 if [ ! -d "$INPUT_DIR" ]; then
   echo "Error: input directory does not exist: $INPUT_DIR" >&2
   exit 1
+fi
+
+# Create output directory if it doesn't exist
+if [ ! -d "$OUTPUT_DIR" ]; then
+  mkdir -p "$OUTPUT_DIR"
+  echo "Created output directory: $OUTPUT_DIR"
 fi
 
 shopt -s nullglob
@@ -54,6 +61,8 @@ run_transcription() {
   local file="$1"
   local base
   base="${file%.mp3}"
+  local filename
+  filename="$(basename "$file" .mp3)"
 
   echo "Transcribing: $file"
 
@@ -64,14 +73,14 @@ run_transcription() {
     -l ro \
     -m ~/models/whisper/ggml-large-v3.bin \
     -otxt \
-    -of "$(basename "$file" .mp3)" \
+    -of "$OUTPUT_DIR/$filename" \
     --beam-size 5 \
     --best-of 5 \
     --temperature 0.0 \
     --temperature-inc 0.2 \
     --max-context 0
 
-  echo "Saved transcript to: ${base}.txt"
+  echo "Saved transcript to: $OUTPUT_DIR/${filename}.txt"
 }
 
 for file in "${files[@]}"; do

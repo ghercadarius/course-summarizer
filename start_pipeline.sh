@@ -2,6 +2,7 @@
 set -euo pipefail
 
 INPUT_DIR="${1:-./input}"
+OUTPUT_DIR="${2:-./output}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONVERT_SCRIPT="$SCRIPT_DIR/convertmp3.sh"
 TRANSCRIBE_SCRIPT="$SCRIPT_DIR/transcribemp3.sh"
@@ -64,7 +65,7 @@ echo "Converting MP4 files to MP3 in: $INPUT_DIR"
 bash "$CONVERT_SCRIPT" "$INPUT_DIR"
 
 echo "Transcribing MP3 files from: $INPUT_DIR"
-bash "$TRANSCRIBE_SCRIPT" "$INPUT_DIR"
+bash "$TRANSCRIBE_SCRIPT" "$INPUT_DIR" "$OUTPUT_DIR"
 
 PIPELINE_SUCCESS=1
 echo "Pipeline complete."
