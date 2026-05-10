@@ -5,8 +5,6 @@ INPUT_DIR="${1:-./input}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONVERT_SCRIPT="$SCRIPT_DIR/convertmp3.sh"
 TRANSCRIBE_SCRIPT="$SCRIPT_DIR/transcribemp3.sh"
-ENV_DIR="$SCRIPT_DIR/whisper-env"
-ENV_ACTIVATE="$ENV_DIR/bin/activate"
 
 if [ ! -d "$INPUT_DIR" ]; then
     echo "Error: input folder does not exist: $INPUT_DIR" >&2
@@ -23,9 +21,9 @@ if [ ! -f "$TRANSCRIBE_SCRIPT" ]; then
     exit 1
 fi
 
-if [ ! -f "$ENV_ACTIVATE" ]; then
-    echo "Error: missing virtual environment activation script: $ENV_ACTIVATE" >&2
-    echo "Create it first (example): ./setup_whisper_env.sh" >&2
+# Check for whisper-cli at system level
+if ! command -v whisper-cli >/dev/null 2>&1; then
+    echo "Error: whisper-cli is not installed at system level." >&2
     exit 1
 fi
 
@@ -58,16 +56,6 @@ trap cleanup_temp_mp3s EXIT
 
 echo "Converting MP4 files to MP3 in: $INPUT_DIR"
 bash "$CONVERT_SCRIPT" "$INPUT_DIR"
-
-echo "Activating Whisper environment: $ENV_DIR"
-# shellcheck disable=SC1091
-source "$ENV_ACTIVATE"
-
-if ! command -v whisper >/dev/null 2>&1 && ! command -v whisper-cli >/dev/null 2>&1; then
-    echo "Error: Whisper CLI is not available in $ENV_DIR." >&2
-    echo "Install package in the environment (example): pip install openai-whisper" >&2
-    exit 1
-fi
 
 echo "Transcribing MP3 files from: $INPUT_DIR"
 bash "$TRANSCRIBE_SCRIPT" "$INPUT_DIR"

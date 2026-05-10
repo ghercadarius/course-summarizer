@@ -1,9 +1,6 @@
 #!/bin/bash
 set -euo pipefail
 
-#!/bin/bash
-set -euo pipefail
-
 # Usage: convertmp3.sh [target_dir]
 # Converts all .mp4 files in the target directory to .mp3.
 # Defaults to current directory when no argument is provided.
