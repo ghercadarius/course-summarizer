@@ -31,22 +31,43 @@ else
   WHISPER_CMD=whisper-cli
 fi
 
-for file in "${files[@]}"; do
+run_transcription() {
+  local file="$1"
+  local dir
+  dir="$(dirname "$file")"
+  local base
   base="${file%.mp3}"
 
   echo "Transcribing: $file"
 
-  "$WHISPER_CMD" \
-    -f "$file" \
-    -l ro \
-    -m ~/models/whisper/ggml-large-v3.bin \
-    -otxt \
-    -of "$(basename "$file" .mp3)" \
-    --beam-size 5 \
-    --best-of 5 \
-    --temperature 0.0 \
-    --temperature-inc 0.2 \
-    --max-context 0
+  if [ "$WHISPER_CMD" = "whisper-cli" ]; then
+    # Legacy whisper-cli (ggml) invocation
+    "$WHISPER_CMD" \
+      -f "$file" \
+      -l ro \
+      -m ~/models/whisper/ggml-large-v3.bin \
+      -otxt \
+      -of "$(basename "$file" .mp3)" \
+      --beam-size 5 \
+      --best-of 5 \
+      --temperature 0.0 \
+      --temperature-inc 0.2 \
+      --max-context 0
+  else
+    # openai-whisper CLI invocation
+    # Use model name from WHISPER_MODEL env var if set, otherwise default to 'large'
+    MODEL="${WHISPER_MODEL:-large}"
+    "$WHISPER_CMD" "$file" \
+      --model "$MODEL" \
+      --language ro \
+      --task transcribe \
+      --output_format txt \
+      --output_dir "$dir"
+  fi
 
   echo "Saved transcript to: ${base}.txt"
+}
+
+for file in "${files[@]}"; do
+  run_transcription "$file"
 done
