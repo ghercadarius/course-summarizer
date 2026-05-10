@@ -29,6 +29,7 @@ fi
 
 # Keep track of MP3 files that did not exist before conversion so we can clean them up.
 declare -a TEMP_MP3S=()
+PIPELINE_SUCCESS=0
 shopt -s nullglob
 for mp4 in "$INPUT_DIR"/*.mp4; do
     mp3="${mp4%.mp4}.mp3"
@@ -39,6 +40,11 @@ done
 shopt -u nullglob
 
 cleanup_temp_mp3s() {
+    if [ "$PIPELINE_SUCCESS" -ne 1 ]; then
+        echo "Pipeline did not complete successfully. Keeping temporary MP3 files for retry/debug."
+        return
+    fi
+
     if [ "${#TEMP_MP3S[@]}" -eq 0 ]; then
         return
     fi
@@ -60,4 +66,5 @@ bash "$CONVERT_SCRIPT" "$INPUT_DIR"
 echo "Transcribing MP3 files from: $INPUT_DIR"
 bash "$TRANSCRIBE_SCRIPT" "$INPUT_DIR"
 
+PIPELINE_SUCCESS=1
 echo "Pipeline complete."

@@ -7,6 +7,32 @@ if ! command -v whisper-cli >/dev/null 2>&1; then
   exit 1
 fi
 
+# Ensure whisper-cli can load its shared library (libwhisper.so.1).
+# Some installs require LD_LIBRARY_PATH to include non-default library dirs.
+WHISPER_BIN="$(command -v whisper-cli)"
+
+ensure_whisper_runtime() {
+  if "$WHISPER_BIN" --help >/dev/null 2>&1; then
+    return 0
+  fi
+
+  export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-}:/usr/local/lib:/usr/lib:/usr/lib/x86_64-linux-gnu:$HOME/.local/lib"
+
+  if "$WHISPER_BIN" --help >/dev/null 2>&1; then
+    return 0
+  fi
+
+  echo "Error: whisper-cli was found but cannot start (likely missing libwhisper.so.1 at runtime)." >&2
+  echo "Current whisper-cli path: $WHISPER_BIN" >&2
+  echo "Try one of the following:" >&2
+  echo "  1) Install/repair whisper.cpp runtime libraries" >&2
+  echo "  2) Add the libwhisper directory to LD_LIBRARY_PATH" >&2
+  echo "  3) If installed in /usr/local/lib, run: sudo ldconfig" >&2
+  exit 1
+}
+
+ensure_whisper_runtime
+
 # Folder to scan (current folder by default)
 INPUT_DIR="${1:-.}"
 
