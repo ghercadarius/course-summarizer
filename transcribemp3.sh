@@ -57,15 +57,14 @@ run_transcription() {
 
   echo "Transcribing: $file"
 
-  # whisper-cli (ggml) invocation with GPU support
-  # Pass -gpu flag to enable GPU acceleration if available
+  # whisper-cli (ggml) invocation
+  # GPU is enabled by default; use -ng to disable if needed
   whisper-cli \
     -f "$file" \
     -l ro \
     -m ~/models/whisper/ggml-large-v3.bin \
     -otxt \
     -of "$(basename "$file" .mp3)" \
-    -gpu auto \
     --beam-size 5 \
     --best-of 5 \
     --temperature 0.0 \
