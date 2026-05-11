@@ -4,7 +4,7 @@ set -euo pipefail
 # Summarize each file in the output directory using llama-cli
 # Configurable via environment variables (see Usage below)
 
-MODEL="${MODEL:-/home/darius/models/qwen-7b-q5_kgm.gguf}"
+MODEL="${MODEL:-/home/darius/models/llama.cpp/models/qwen-7b-q5_kgm.gguf}"
 OUTPUT_DIR="${OUTPUT_DIR:-output}"
 SUMMARY_SUFFIX="${SUMMARY_SUFFIX:-.summary.txt}"
 # Use PROMPT_TEMPLATE with a single literal "%s" placeholder for the file contents
