@@ -4,74 +4,19 @@ set -euo pipefail
 # Summarize each file in the output directory using llama-cli
 # Configurable via environment variables (see Usage below)
 
-MODEL="${MODEL:-/home/darius/models/llama.cpp/models/qwen-7b-q5_kgm.gguf}"
+HF_MODEL="${HF_MODEL:-Qwen/Qwen2.5-7B-Instruct-GGUF:Q4_K_M}"
 OUTPUT_DIR="${OUTPUT_DIR:-output}"
 SUMMARY_SUFFIX="${SUMMARY_SUFFIX:-.summary.txt}"
 # Use PROMPT_TEMPLATE with a single literal "%s" placeholder for the file contents
 PROMPT_TEMPLATE="${PROMPT_TEMPLATE:-Summarize the following trascript with the topics it describes and what was discussed in it in english:\n\n%s}"
 # If you set PROMPT (full prompt string containing %s) it will override PROMPT_TEMPLATE
 LLAMA_CLI="${LLAMA_CLI:-llama-cli}"
-# Additional llama-cli args (defaults adapted from your example)
-LLAMA_ARGS="${LLAMA_ARGS:---n-gpu-layers 12 --main-gpu 0 --ctx 2048 -t 8 --temp 0.2 --top_p 0.95 -n 512}"
-
-# Probe llama-cli help to detect supported runtime flags
-help_output=$("$LLAMA_CLI" --help 2>&1 || true)
-supports_gpu=false
-if echo "$help_output" | grep -q -- '--gpu\b'; then
-  supports_gpu=true
-fi
-supports_f=false
-if echo "$help_output" | grep -q -E "\-f\b|--file\b"; then
-  supports_f=true
-fi
-
-# Build final args array, excluding unsupported flags (e.g. --gpu)
-FINAL_LLAMA_ARGS=()
-if [ -n "${LLAMA_ARGS:-}" ]; then
-  read -r -a _args <<< "$LLAMA_ARGS"
-  i=0
-  len=${#_args[@]}
-  while [ $i -lt $len ]; do
-    tok=${_args[$i]}
-    if [[ "$tok" == --* || "$tok" == -[!-]* || "$tok" == -[A-Za-z] ]]; then
-      # check whether help mentions this option (word boundary)
-      if echo "$help_output" | grep -q -- "${tok//"/\\"}\b"; then
-        FINAL_LLAMA_ARGS+=("$tok")
-        # if next token exists and is not an option, treat it as the value for this flag
-        next_index=$((i+1))
-        if [ $next_index -lt $len ]; then
-          next_tok=${_args[$next_index]}
-          if [[ "$next_tok" != -* ]]; then
-            FINAL_LLAMA_ARGS+=("$next_tok")
-            i=$((i+1))
-          fi
-        fi
-      else
-        echo "Note: $LLAMA_CLI does not support $tok; removing from LLAMA_ARGS."
-        # skip potential value following unsupported flag
-        next_index=$((i+1))
-        if [ $next_index -lt $len ]; then
-          next_tok=${_args[$next_index]}
-          if [[ "$next_tok" != -* ]]; then
-            i=$((i+1))
-          fi
-        fi
-      fi
-    else
-      # positional/value token (no leading -), include it
-      FINAL_LLAMA_ARGS+=("$tok")
-    fi
-    i=$((i+1))
-  done
-fi
+# Additional llama-cli args
+LLAMA_ARGS="${LLAMA_ARGS:---ctx 2048 -t 8 --temp 0.2 --top_p 0.95 -n 512}"
 
 if ! command -v "$LLAMA_CLI" >/dev/null 2>&1; then
   echo "Error: $LLAMA_CLI not found in PATH." >&2
   exit 1
-fi
-
-if [ ! -f "$MODEL" ]; then
-  echo "Warning: model file '$MODEL' not found. Ensure MODEL points to a valid model file." >&2
 fi
 
 if [ ! -d "$OUTPUT_DIR" ]; then
@@ -84,44 +29,25 @@ for file in "$OUTPUT_DIR"/*; do
   [ -f "$file" ] || continue
   echo "Summarizing: $file"
 
-  # If the CLI supports -f/--file, pass the transcript file directly; otherwise embed contents
-  if [ "$supports_f" = true ]; then
-    # Prepare prompt header by removing the %s placeholder (if present)
-    if [ -n "${PROMPT:-}" ]; then
-      template="$PROMPT"
-    else
-      template="$PROMPT_TEMPLATE"
-    fi
-    PROMPT_HEADER=${template//%s/}
+  # Escape double quotes and load file contents
+  TEXT=$(sed -e 's/"/\\"/g' "$file")
 
-    out_file="${file}${SUMMARY_SUFFIX}"
-
-    if ! "$LLAMA_CLI" -m "$MODEL" "${FINAL_LLAMA_ARGS[@]}" -p "$PROMPT_HEADER" -f "$file" > "$out_file"; then
-      echo "Failed to summarize $file" >&2
-    else
-      echo "Wrote summary -> $out_file"
-    fi
+  # If PROMPT env var provided, use it as the template; otherwise use PROMPT_TEMPLATE
+  if [ -n "${PROMPT:-}" ]; then
+    template="$PROMPT"
   else
-    # Escape double quotes like in the example, then load into TEXT
-    TEXT=$(sed -e 's/"/\\"/g' "$file")
+    template="$PROMPT_TEMPLATE"
+  fi
 
-    # If PROMPT env var provided, use it as the template; otherwise use PROMPT_TEMPLATE
-    if [ -n "${PROMPT:-}" ]; then
-      template="$PROMPT"
-    else
-      template="$PROMPT_TEMPLATE"
-    fi
+  # Replace literal %s in template with the file contents
+  PROMPT=${template//%s/$TEXT}
 
-    # Replace literal %s in template with the file contents
-    PROMPT=${template//%s/$TEXT}
+  out_file="${file}${SUMMARY_SUFFIX}"
 
-    out_file="${file}${SUMMARY_SUFFIX}"
-
-    if ! "$LLAMA_CLI" -m "$MODEL" "${FINAL_LLAMA_ARGS[@]}" -p "$PROMPT" > "$out_file"; then
-      echo "Failed to summarize $file" >&2
-    else
-      echo "Wrote summary -> $out_file"
-    fi
+  if ! "$LLAMA_CLI" -hf "$HF_MODEL" $LLAMA_ARGS -p "$PROMPT" > "$out_file"; then
+    echo "Failed to summarize $file" >&2
+  else
+    echo "Wrote summary -> $out_file"
   fi
 done
 
@@ -129,11 +55,14 @@ echo "All done."
 
 # Usage notes:
 # - Override variables by exporting them before running, e.g.:
-#   export MODEL=/home/darius/models/qwen-7b-q5_kgm.gguf
-#   export LLAMA_CLI=./build/bin/llama-cli
-#   export LLAMA_ARGS='--gpu --n-gpu-layers 12 --ctx 2048 -t 8 --temp 0.2 --top_p 0.95 -n 512'
+#   export HF_MODEL=Qwen/Qwen2.5-7B-Instruct-GGUF:Q4_K_M
+#   export LLAMA_CLI=llama-cli
+#   export LLAMA_ARGS='--ctx 2048 -t 8 --temp 0.2 --top_p 0.95 -n 512'
 #   export OUTPUT_DIR=output
 #   export SUMMARY_SUFFIX=.summary.txt
 #   export PROMPT_TEMPLATE='Rezumă în 5 puncte, în limba română:\n\n%s'
 #   export PROMPT='Rezumă în 3 puncte, în limba română:\n\n%s'  # optional override of template
 #   ./summarize_outputs.sh
+#
+# - For other HuggingFace models, use format: organization/model-name:quantization
+#   Example: Meta-Llama/Llama-3-8B-Instruct-GGUF:Q4_K_M
