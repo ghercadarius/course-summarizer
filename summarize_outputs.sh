@@ -11,8 +11,8 @@ SUMMARY_SUFFIX="${SUMMARY_SUFFIX:-.summary.txt}"
 PROMPT_TEMPLATE="${PROMPT_TEMPLATE:-Summarize the following trascript with the topics it describes and what was discussed in it in english:\n\n%s}"
 # If you set PROMPT (full prompt string containing %s) it will override PROMPT_TEMPLATE
 LLAMA_CLI="${LLAMA_CLI:-llama-cli}"
-# Additional llama-cli args
-LLAMA_ARGS="${LLAMA_ARGS:---ctx 2048 -t 8 --temp 0.2 --top_p 0.95 -n 512}"
+# Additional llama-cli args (most flags may not be supported with -hf)
+LLAMA_ARGS="${LLAMA_ARGS:-}"
 
 if ! command -v "$LLAMA_CLI" >/dev/null 2>&1; then
   echo "Error: $LLAMA_CLI not found in PATH." >&2
@@ -44,7 +44,7 @@ for file in "$OUTPUT_DIR"/*; do
 
   out_file="${file}${SUMMARY_SUFFIX}"
 
-  if ! "$LLAMA_CLI" -hf "$HF_MODEL" $LLAMA_ARGS -p "$PROMPT" > "$out_file"; then
+  if ! timeout 300 "$LLAMA_CLI" -hf "$HF_MODEL" $LLAMA_ARGS -p "$PROMPT" < /dev/null > "$out_file" 2>&1; then
     echo "Failed to summarize $file" >&2
   else
     echo "Wrote summary -> $out_file"
