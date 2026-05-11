@@ -11,17 +11,21 @@ SUMMARY_SUFFIX="${SUMMARY_SUFFIX:-.summary.txt}"
 PROMPT_TEMPLATE="${PROMPT_TEMPLATE:-Summarize the following trascript with the topics it describes and what was discussed in it in english:\n\n%s}"
 # If you set PROMPT (full prompt string containing %s) it will override PROMPT_TEMPLATE
 LLAMA_CLI="${LLAMA_CLI:-llama-cli}"
-# Additional llama-cli args (defaults taken from your example)
-LLAMA_ARGS="${LLAMA_ARGS:---gpu --n-gpu-layers 12 --ctx 2048 -t 8 --temp 0.2 --top_p 0.95 -n 512}"
+# Additional llama-cli args (defaults adapted from your example)
+LLAMA_ARGS="${LLAMA_ARGS:---n-gpu-layers 12 --main-gpu 0 --ctx 2048 -t 8 --temp 0.2 --top_p 0.95 -n 512}"
 
-# Detect whether the llama-cli binary supports the --gpu flag; if not, drop it.
+# Probe llama-cli help to detect supported runtime flags
 help_output=$("$LLAMA_CLI" --help 2>&1 || true)
 supports_gpu=false
 if echo "$help_output" | grep -q -- '--gpu\b'; then
   supports_gpu=true
 fi
+supports_f=false
+if echo "$help_output" | grep -q -E "\-f\b|--file\b"; then
+  supports_f=true
+fi
 
-# Build final args array, excluding --gpu if unsupported
+# Build final args array, excluding unsupported flags (e.g. --gpu)
 FINAL_LLAMA_ARGS=()
 if [ -n "${LLAMA_ARGS:-}" ]; then
   read -r -a _args <<< "$LLAMA_ARGS"
@@ -53,26 +57,44 @@ for file in "$OUTPUT_DIR"/*; do
   [ -f "$file" ] || continue
   echo "Summarizing: $file"
 
-  # Escape double quotes like in your example command, then load into TEXT
-  TEXT=$(sed -e 's/"/\\"/g' "$file")
+  # If the CLI supports -f/--file, pass the transcript file directly; otherwise embed contents
+  if [ "$supports_f" = true ]; then
+    # Prepare prompt header by removing the %s placeholder (if present)
+    if [ -n "${PROMPT:-}" ]; then
+      template="$PROMPT"
+    else
+      template="$PROMPT_TEMPLATE"
+    fi
+    PROMPT_HEADER=${template//%s/}
 
-  # If PROMPT env var provided, use it as the template; otherwise use PROMPT_TEMPLATE
-  if [ -n "${PROMPT:-}" ]; then
-    template="$PROMPT"
+    out_file="${file}${SUMMARY_SUFFIX}"
+
+    if ! "$LLAMA_CLI" -m "$MODEL" "${FINAL_LLAMA_ARGS[@]}" -p "$PROMPT_HEADER" -f "$file" > "$out_file"; then
+      echo "Failed to summarize $file" >&2
+    else
+      echo "Wrote summary -> $out_file"
+    fi
   else
-    template="$PROMPT_TEMPLATE"
-  fi
+    # Escape double quotes like in the example, then load into TEXT
+    TEXT=$(sed -e 's/"/\\"/g' "$file")
 
-  # Replace literal %s in template with the file contents
-  PROMPT=${template//%s/$TEXT}
+    # If PROMPT env var provided, use it as the template; otherwise use PROMPT_TEMPLATE
+    if [ -n "${PROMPT:-}" ]; then
+      template="$PROMPT"
+    else
+      template="$PROMPT_TEMPLATE"
+    fi
 
-  out_file="${file}${SUMMARY_SUFFIX}"
+    # Replace literal %s in template with the file contents
+    PROMPT=${template//%s/$TEXT}
 
-  # Run llama-cli with additional args and write summary to out_file
-  if ! "$LLAMA_CLI" -m "$MODEL" $LLAMA_ARGS -p "$PROMPT" > "$out_file"; then
-    echo "Failed to summarize $file" >&2
-  else
-    echo "Wrote summary -> $out_file"
+    out_file="${file}${SUMMARY_SUFFIX}"
+
+    if ! "$LLAMA_CLI" -m "$MODEL" "${FINAL_LLAMA_ARGS[@]}" -p "$PROMPT" > "$out_file"; then
+      echo "Failed to summarize $file" >&2
+    else
+      echo "Wrote summary -> $out_file"
+    fi
   fi
 done
 
