@@ -29,12 +29,39 @@ fi
 FINAL_LLAMA_ARGS=()
 if [ -n "${LLAMA_ARGS:-}" ]; then
   read -r -a _args <<< "$LLAMA_ARGS"
-  for tok in "${_args[@]}"; do
-    if [ "$tok" = "--gpu" ] && [ "$supports_gpu" = false ]; then
-      echo "Note: $LLAMA_CLI does not support --gpu; removing from LLAMA_ARGS."
-      continue
+  i=0
+  len=${#_args[@]}
+  while [ $i -lt $len ]; do
+    tok=${_args[$i]}
+    if [[ "$tok" == --* || "$tok" == -[!-]* || "$tok" == -[A-Za-z] ]]; then
+      # check whether help mentions this option (word boundary)
+      if echo "$help_output" | grep -q -- "${tok//"/\\"}\b"; then
+        FINAL_LLAMA_ARGS+=("$tok")
+        # if next token exists and is not an option, treat it as the value for this flag
+        next_index=$((i+1))
+        if [ $next_index -lt $len ]; then
+          next_tok=${_args[$next_index]}
+          if [[ "$next_tok" != -* ]]; then
+            FINAL_LLAMA_ARGS+=("$next_tok")
+            i=$((i+1))
+          fi
+        fi
+      else
+        echo "Note: $LLAMA_CLI does not support $tok; removing from LLAMA_ARGS."
+        # skip potential value following unsupported flag
+        next_index=$((i+1))
+        if [ $next_index -lt $len ]; then
+          next_tok=${_args[$next_index]}
+          if [[ "$next_tok" != -* ]]; then
+            i=$((i+1))
+          fi
+        fi
+      fi
+    else
+      # positional/value token (no leading -), include it
+      FINAL_LLAMA_ARGS+=("$tok")
     fi
-    FINAL_LLAMA_ARGS+=("$tok")
+    i=$((i+1))
   done
 fi
 
