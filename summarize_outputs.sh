@@ -14,6 +14,26 @@ LLAMA_CLI="${LLAMA_CLI:-llama-cli}"
 # Additional llama-cli args (defaults taken from your example)
 LLAMA_ARGS="${LLAMA_ARGS:---gpu --n-gpu-layers 12 --ctx 2048 -t 8 --temp 0.2 --top_p 0.95 -n 512}"
 
+# Detect whether the llama-cli binary supports the --gpu flag; if not, drop it.
+help_output=$("$LLAMA_CLI" --help 2>&1 || true)
+supports_gpu=false
+if echo "$help_output" | grep -q -- '--gpu\b'; then
+  supports_gpu=true
+fi
+
+# Build final args array, excluding --gpu if unsupported
+FINAL_LLAMA_ARGS=()
+if [ -n "${LLAMA_ARGS:-}" ]; then
+  read -r -a _args <<< "$LLAMA_ARGS"
+  for tok in "${_args[@]}"; do
+    if [ "$tok" = "--gpu" ] && [ "$supports_gpu" = false ]; then
+      echo "Note: $LLAMA_CLI does not support --gpu; removing from LLAMA_ARGS."
+      continue
+    fi
+    FINAL_LLAMA_ARGS+=("$tok")
+  done
+fi
+
 if ! command -v "$LLAMA_CLI" >/dev/null 2>&1; then
   echo "Error: $LLAMA_CLI not found in PATH." >&2
   exit 1
