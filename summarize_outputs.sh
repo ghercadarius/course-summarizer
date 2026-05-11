@@ -10,7 +10,7 @@ SUMMARY_SUFFIX="${SUMMARY_SUFFIX:-.summary.txt}"
 # Use PROMPT_TEMPLATE with a single literal "%s" placeholder for the file contents
 PROMPT_TEMPLATE="${PROMPT_TEMPLATE:-Summarize the following trascript with the topics it describes and what was discussed in it in english:\n\n%s}"
 # If you set PROMPT (full prompt string containing %s) it will override PROMPT_TEMPLATE
-LLAMA_CLI="${LLAMA_CLI:-./build/bin/llama-cli}"
+LLAMA_CLI="${LLAMA_CLI:-llama-cli}"
 # Additional llama-cli args (defaults taken from your example)
 LLAMA_ARGS="${LLAMA_ARGS:---gpu --n-gpu-layers 12 --ctx 2048 -t 8 --temp 0.2 --top_p 0.95 -n 512}"
 
